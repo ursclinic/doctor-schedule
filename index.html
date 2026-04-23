@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>醫師班表</title>
+  <style>
+    :root {
+      --bg: #f4f7f6;
+      --text: #17211f;
+      --muted: #66736f;
+      --line: #d9e2df;
+      --card: #ffffff;
+      --accent: #197278;
+      --accent-soft: #e2f2f1;
+      --partial: #8a5a13;
+      --partial-soft: #fff3d9;
+      --danger: #b42318;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", sans-serif;
+    }
+
+    header {
+      padding: 24px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: #fff;
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 6px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button:hover {
+      filter: brightness(0.95);
+    }
+
+    select {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 6px;
+      padding: 0 12px;
+      font: inherit;
+    }
+
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .weekday {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      padding: 4px 0;
+    }
+
+    .day {
+      min-height: 132px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .day.empty {
+      background: transparent;
+      border-color: transparent;
+    }
+
+    .date {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-weight: 800;
+    }
+
+    .doctor {
+      display: block;
+      width: 100%;
+      margin-top: 6px;
+      padding: 7px 8px;
+      border-radius: 6px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .doctor.partial {
+      background: var(--partial-soft);
+      color: var(--partial);
+    }
+
+    .doctor-name {
+      font-weight: 800;
+    }
+
+    .doctor-time {
+      display: block;
+      margin-top: 2px;
+    }
+
+    .error {
+      color: var(--danger);
+      background: #fff;
+      border: 1px solid #f3b8b3;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    @media (max-width: 760px) {
+      header {
+        padding: 18px;
+      }
+
+      main {
+        padding: 16px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .calendar {
+        grid-template-columns: 1fr;
+      }
+
+      .weekday,
+      .day.empty {
+        display: none;
+      }
+
+      .day {
+        min-height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">2026 年 5 月醫師班表</h1>
+        <div class="meta" id="sourceLabel">資料來源：Google Sheet「2605」</div>
+      </div>
+      <div>
+        <select id="monthSelect" aria-label="選擇月份">
+          <option value="2605">2026/05</option>
+          <option value="2606">2026/06</option>
+        </select>
+        <button type="button" id="refreshButton">重新整理</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="error" class="error"></div>
+    <div class="toolbar">
+      <div class="status" id="status">尚未載入</div>
+      <div class="status">每 10 秒自動更新</div>
+    </div>
+    <section class="calendar" id="calendar" aria-label="醫師班表月曆"></section>
+  </main>
+
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycby95ijwscdTkEVB8XhP_xuy2sVJt7OWt9tySfh0coMrJ5kI1IW5j1FXydN7vVpmBqmI/exec";
+
+    const monthSettings = {
+      "2605": {
+        title: "2026 年 5 月醫師班表",
+        source: "2605",
+        month: 5,
+        firstDayWeekday: 5,
+        daysInMonth: 31
+      },
+      "2606": {
+        title: "2026 年 6 月醫師班表",
+        source: "2606",
+        month: 6,
+        firstDayWeekday: 1,
+        daysInMonth: 30
+      }
+    };
+
+    const doctorNames = {
+      A: "A醫師",
+      B: "B醫師",
+      C: "C醫師",
+      D: "D醫師",
+      E: "E醫師",
+      F: "F醫師",
+      G: "G醫師",
+      H: "H醫師",
+      J: "J醫師",
+      P: "P醫師"
+    };
+
+    const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+    const calendar = document.getElementById("calendar");
+    const status = document.getElementById("status");
+    const errorBox = document.getElementById("error");
+    const refreshButton = document.getElementById("refreshButton");
+    const monthSelect = document.getElementById("monthSelect");
+    const pageTitle = document.getElementById("pageTitle");
+    const sourceLabel = document.getElementById("sourceLabel");
+
+    function formatDoctor(doctor) {
+      const name = doctor.name || doctorNames[doctor.code] || doctor.code;
+      const isFullDay = doctor.start === "12:30" && doctor.end === "20:30";
+      const time = isFullDay ? "全天 12:30-20:30" : `${doctor.start}-${doctor.end}`;
+      const className = isFullDay ? "doctor" : "doctor partial";
+
+      return `
+        <span class="${className}">
+          <span class="doctor-name">${name}</span>
+          <span class="doctor-time">${time}</span>
+        </span>
+      `;
+    }
+
+    function buildApiUrl(sheetName) {
+      return `${API_URL}?sheet=${encodeURIComponent(sheetName)}`;
+    }
+
+    function renderSchedule(rows, settings) {
+      const byDay = new Map(rows.map(row => [Number(row.day), row]));
+      const cells = [];
+
+      weekdays.forEach(day => {
+        cells.push(`<div class="weekday">${day}</div>`);
+      });
+
+      for (let i = 0; i < settings.firstDayWeekday; i++) {
+        cells.push(`<div class="day empty"></div>`);
+      }
+
+      for (let day = 1; day <= settings.daysInMonth; day++) {
+        const row = byDay.get(day);
+        const weekday = row ? row.weekday : weekdays[(settings.firstDayWeekday + day - 1) % 7];
+        const doctors = row && row.doctors.length
+          ? row.doctors.map(formatDoctor).join("")
+          : `<span class="meta">未排診</span>`;
+
+        cells.push(`
+          <article class="day">
+            <div class="date">
+              <span>${settings.month}/${day}</span>
+              <span class="meta">${weekday}</span>
+            </div>
+            ${doctors}
+          </article>
+        `);
+      }
+
+      calendar.innerHTML = cells.join("");
+    }
+
+    async function loadSchedule() {
+      if (!API_URL.startsWith("https://script.google.com/")) {
+        errorBox.style.display = "block";
+        errorBox.textContent = "請先在 HTML 裡把 API_URL 換成你的 Apps Script /exec 網址。";
+        return;
+      }
+
+      try {
+        errorBox.style.display = "none";
+        status.textContent = "讀取中...";
+
+        const sheetName = monthSelect.value;
+        const settings = monthSettings[sheetName];
+        pageTitle.textContent = settings.title;
+        sourceLabel.textContent = `資料來源：Google Sheet「${settings.source}」`;
+
+        const response = await fetch(buildApiUrl(sheetName));
+        if (!response.ok) {
+          throw new Error(`API 回應失敗：${response.status}`);
+        }
+
+        const rows = await response.json();
+        renderSchedule(rows, settings);
+        status.textContent = `最後更新：${new Date().toLocaleString("zh-TW")}`;
+      } catch (error) {
+        errorBox.style.display = "block";
+        errorBox.textContent = `讀取失敗：${error.message}`;
+        status.textContent = "更新失敗";
+      }
+    }
+
+    refreshButton.addEventListener("click", loadSchedule);
+    monthSelect.addEventListener("change", loadSchedule);
+    loadSchedule();
+    setInterval(loadSchedule, 10000);
+  </script>
+</body>
+</html>
