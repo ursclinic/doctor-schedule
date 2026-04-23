@@ -211,8 +211,9 @@
       </div>
       <div>
         <select id="monthSelect" aria-label="選擇月份">
-          <option value="2605">2026/05</option>
-          <option value="2606">2026/06</option>
+          <option value="2604">2026/04</option>
+<option value="2605">2026/05</option>
+<option value="2606">2026/06</option>
         </select>
         <button type="button" id="refreshButton">重新整理</button>
       </div>
@@ -232,21 +233,29 @@
     const API_URL = "https://script.google.com/macros/s/AKfycby95ijwscdTkEVB8XhP_xuy2sVJt7OWt9tySfh0coMrJ5kI1IW5j1FXydN7vVpmBqmI/exec";
 
     const monthSettings = {
-      "2605": {
-        title: "2026 年 5 月醫師班表",
-        source: "2605",
-        month: 5,
-        firstDayWeekday: 5,
-        daysInMonth: 31
-      },
-      "2606": {
-        title: "2026 年 6 月醫師班表",
-        source: "2606",
-        month: 6,
-        firstDayWeekday: 1,
-        daysInMonth: 30
-      }
-    };
+  "2604": {
+    title: "2026 年 4 月醫師班表",
+    source: "2604",
+    month: 4,
+    firstDayWeekday: 3,
+    daysInMonth: 30
+  },
+  "2605": {
+    title: "2026 年 5 月醫師班表",
+    source: "2605",
+    month: 5,
+    firstDayWeekday: 5,
+    daysInMonth: 31
+  },
+  "2606": {
+    title: "2026 年 6 月醫師班表",
+    source: "2606",
+    month: 6,
+    firstDayWeekday: 1,
+    daysInMonth: 30
+  }
+};
+
 
     const doctorNames = {
       A: "A醫師",
@@ -354,8 +363,21 @@
 
     refreshButton.addEventListener("click", loadSchedule);
     monthSelect.addEventListener("change", loadSchedule);
-    loadSchedule();
-    setInterval(loadSchedule, 10000);
+    function selectCurrentMonth() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const sheetName = String(year).slice(2) + String(month).padStart(2, "0");
+
+  if (monthSettings[sheetName]) {
+    monthSelect.value = sheetName;
+  }
+}
+
+selectCurrentMonth();
+loadSchedule();
+setInterval(loadSchedule, 10000);
+
   </script>
 </body>
 </html>
