@@ -120,32 +120,28 @@ function parseDoctorCell(cellText, doctorMaps) {
 
   const doctors = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  lines.forEach(function(line) {
+    const timeMatch = line.match(/\((\d{1,2}:?\d{2})-(\d{1,2}:?\d{2})\)/);
+    const start = timeMatch ? normalizeTime(timeMatch[1]) : "12:30";
+    const end = timeMatch ? normalizeTime(timeMatch[2]) : "20:30";
 
-    const codeWithTime = line.match(/^([A-Z])\s*\((\d{1,2}:?\d{2})-(\d{1,2}:?\d{2})\)$/);
-    if (codeWithTime) {
-      doctors.push(buildDoctor(codeWithTime[1], "", codeWithTime[2], codeWithTime[3], doctorMaps));
-      continue;
-    }
+    const personText = line
+      .replace(/\((\d{1,2}:?\d{2})-(\d{1,2}:?\d{2})\)/, "")
+      .trim();
 
-    const codeOnly = line.match(/^([A-Z])$/);
+    const codeOnly = personText.match(/^([A-Z])$/);
+
     if (codeOnly) {
-      doctors.push(buildDoctor(codeOnly[1], "", "12:30", "20:30", doctorMaps));
-      continue;
+      doctors.push(buildDoctor(codeOnly[1], "", start, end, doctorMaps));
+      return;
     }
 
-    const nameWithTime = line.match(/^(.+?)\s*(?:醫師|院長)?\s*\((\d{1,2}:?\d{2})-(\d{1,2}:?\d{2})\)$/);
-    if (nameWithTime) {
-      doctors.push(buildDoctor("", nameWithTime[1], nameWithTime[2], nameWithTime[3], doctorMaps));
-      continue;
-    }
+    const cleanName = normalizeDoctorName(personText);
 
-    const nameOnly = line.match(/^(.+?)\s*(?:醫師|院長)$/);
-    if (nameOnly) {
-      doctors.push(buildDoctor("", nameOnly[1], "12:30", "20:30", doctorMaps));
+    if (cleanName) {
+      doctors.push(buildDoctor("", cleanName, start, end, doctorMaps));
     }
-  }
+  });
 
   return doctors;
 }
