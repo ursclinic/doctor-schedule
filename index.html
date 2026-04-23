@@ -1,383 +1,225 @@
-<!doctype html>
-<html lang="zh-Hant">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>醫師班表</title>
-  <style>
-    :root {
-      --bg: #f4f7f6;
-      --text: #17211f;
-      --muted: #66736f;
-      --line: #d9e2df;
-      --card: #ffffff;
-      --accent: #197278;
-      --accent-soft: #e2f2f1;
-      --partial: #8a5a13;
-      --partial-soft: #fff3d9;
-      --danger: #b42318;
-    }
+const SPREADSHEET_ID = "1EJulohs-p5vFSXrEWdlj7L3WROZ7oe1DQygytFRxU8c";
+const SHEET_NAME = "2604";
+const PUBLIC_SPREADSHEET_ID = "1FQNgPmmFgleSbWBSrsq_1eTolAo7IrLHKsu2s4pR7gs";
+const PUBLIC_SHEET_NAME = "對外醫師班表即時更新";
 
-    * {
-      box-sizing: border-box;
-    }
+function doGet(e) {
+  const sheetName = e && e.parameter && e.parameter.sheet
+    ? e.parameter.sheet
+    : SHEET_NAME;
 
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", sans-serif;
-    }
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const doctorMaps = getDoctorMaps(ss);
+  const sheet = ss.getSheetByName(sheetName);
 
-    header {
-      padding: 24px;
-      background: #ffffff;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .topbar {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 16px;
-      max-width: 1120px;
-      margin: 0 auto;
-    }
-
-    h1 {
-      margin: 0 0 6px;
-      font-size: 28px;
-      line-height: 1.2;
-    }
-
-    .meta {
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    main {
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-
-    .status {
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    button {
-      appearance: none;
-      border: 1px solid var(--accent);
-      background: var(--accent);
-      color: #fff;
-      min-height: 40px;
-      padding: 0 14px;
-      border-radius: 6px;
-      font: inherit;
-      cursor: pointer;
-    }
-
-    button:hover {
-      filter: brightness(0.95);
-    }
-
-    select {
-      min-height: 40px;
-      border: 1px solid var(--line);
-      background: #fff;
-      color: var(--text);
-      border-radius: 6px;
-      padding: 0 12px;
-      font: inherit;
-    }
-
-    .calendar {
-      display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    .weekday {
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 700;
-      text-align: center;
-      padding: 4px 0;
-    }
-
-    .day {
-      min-height: 132px;
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-    }
-
-    .day.empty {
-      background: transparent;
-      border-color: transparent;
-    }
-
-    .date {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 8px;
-      font-weight: 800;
-    }
-
-    .doctor {
-      display: block;
-      width: 100%;
-      margin-top: 6px;
-      padding: 7px 8px;
-      border-radius: 6px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-size: 13px;
-      line-height: 1.35;
-    }
-
-    .doctor.partial {
-      background: var(--partial-soft);
-      color: var(--partial);
-    }
-
-    .doctor-name {
-      font-weight: 800;
-    }
-
-    .doctor-time {
-      display: block;
-      margin-top: 2px;
-    }
-
-    .error {
-      color: var(--danger);
-      background: #fff;
-      border: 1px solid #f3b8b3;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 16px;
-      display: none;
-    }
-
-    @media (max-width: 760px) {
-      header {
-        padding: 18px;
-      }
-
-      main {
-        padding: 16px;
-      }
-
-      .topbar {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
-      .calendar {
-        grid-template-columns: 1fr;
-      }
-
-      .weekday,
-      .day.empty {
-        display: none;
-      }
-
-      .day {
-        min-height: auto;
-      }
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <div class="topbar">
-      <div>
-        <h1 id="pageTitle">2026 年 5 月醫師班表</h1>
-        <div class="meta" id="sourceLabel">資料來源：Google Sheet「2605」</div>
-      </div>
-      <div>
-        <select id="monthSelect" aria-label="選擇月份">
-          <option value="2604">2026/04</option>
-<option value="2605">2026/05</option>
-<option value="2606">2026/06</option>
-        </select>
-        <button type="button" id="refreshButton">重新整理</button>
-      </div>
-    </div>
-  </header>
-
-  <main>
-    <div id="error" class="error"></div>
-    <div class="toolbar">
-      <div class="status" id="status">尚未載入</div>
-      <div class="status">每 10 秒自動更新</div>
-    </div>
-    <section class="calendar" id="calendar" aria-label="醫師班表月曆"></section>
-  </main>
-
-  <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycby95ijwscdTkEVB8XhP_xuy2sVJt7OWt9tySfh0coMrJ5kI1IW5j1FXydN7vVpmBqmI/exec";
-
-    const monthSettings = {
-  "2604": {
-    title: "2026 年 4 月醫師班表",
-    source: "2604",
-    month: 4,
-    firstDayWeekday: 3,
-    daysInMonth: 30
-  },
-  "2605": {
-    title: "2026 年 5 月醫師班表",
-    source: "2605",
-    month: 5,
-    firstDayWeekday: 5,
-    daysInMonth: 31
-  },
-  "2606": {
-    title: "2026 年 6 月醫師班表",
-    source: "2606",
-    month: 6,
-    firstDayWeekday: 1,
-    daysInMonth: 30
+  if (!sheet) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ error: "找不到分頁：" + sheetName }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
-};
 
+  const rows = getScheduleRows(sheet, doctorMaps, sheetName);
 
-    const doctorNames = {
-      A: "A醫師",
-      B: "B醫師",
-      C: "C醫師",
-      D: "D醫師",
-      E: "E醫師",
-      F: "F醫師",
-      G: "G醫師",
-      H: "H醫師",
-      J: "J醫師",
-      P: "P醫師"
-    };
-
-    const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
-    const calendar = document.getElementById("calendar");
-    const status = document.getElementById("status");
-    const errorBox = document.getElementById("error");
-    const refreshButton = document.getElementById("refreshButton");
-    const monthSelect = document.getElementById("monthSelect");
-    const pageTitle = document.getElementById("pageTitle");
-    const sourceLabel = document.getElementById("sourceLabel");
-
-    function formatDoctor(doctor) {
-      const name = doctor.name || doctorNames[doctor.code] || doctor.code;
-      const isFullDay = doctor.start === "12:30" && doctor.end === "20:30";
-      const time = isFullDay ? "全天 12:30-20:30" : `${doctor.start}-${doctor.end}`;
-      const className = isFullDay ? "doctor" : "doctor partial";
-
-      return `
-        <span class="${className}">
-          <span class="doctor-name">${name}</span>
-          <span class="doctor-time">${time}</span>
-        </span>
-      `;
-    }
-
-    function buildApiUrl(sheetName) {
-      return `${API_URL}?sheet=${encodeURIComponent(sheetName)}`;
-    }
-
-    function renderSchedule(rows, settings) {
-      const byDay = new Map(rows.map(row => [Number(row.day), row]));
-      const cells = [];
-
-      weekdays.forEach(day => {
-        cells.push(`<div class="weekday">${day}</div>`);
-      });
-
-      for (let i = 0; i < settings.firstDayWeekday; i++) {
-        cells.push(`<div class="day empty"></div>`);
-      }
-
-      for (let day = 1; day <= settings.daysInMonth; day++) {
-        const row = byDay.get(day);
-        const weekday = row ? row.weekday : weekdays[(settings.firstDayWeekday + day - 1) % 7];
-        const doctors = row && row.doctors.length
-          ? row.doctors.map(formatDoctor).join("")
-          : `<span class="meta">未排診</span>`;
-
-        cells.push(`
-          <article class="day">
-            <div class="date">
-              <span>${settings.month}/${day}</span>
-              <span class="meta">${weekday}</span>
-            </div>
-            ${doctors}
-          </article>
-        `);
-      }
-
-      calendar.innerHTML = cells.join("");
-    }
-
-    async function loadSchedule() {
-      if (!API_URL.startsWith("https://script.google.com/")) {
-        errorBox.style.display = "block";
-        errorBox.textContent = "請先在 HTML 裡把 API_URL 換成你的 Apps Script /exec 網址。";
-        return;
-      }
-
-      try {
-        errorBox.style.display = "none";
-        status.textContent = "讀取中...";
-
-        const sheetName = monthSelect.value;
-        const settings = monthSettings[sheetName];
-        pageTitle.textContent = settings.title;
-        sourceLabel.textContent = `資料來源：Google Sheet「${settings.source}」`;
-
-        const response = await fetch(buildApiUrl(sheetName));
-        if (!response.ok) {
-          throw new Error(`API 回應失敗：${response.status}`);
-        }
-
-        const rows = await response.json();
-        renderSchedule(rows, settings);
-        status.textContent = `最後更新：${new Date().toLocaleString("zh-TW")}`;
-      } catch (error) {
-        errorBox.style.display = "block";
-        errorBox.textContent = `讀取失敗：${error.message}`;
-        status.textContent = "更新失敗";
-      }
-    }
-
-    refreshButton.addEventListener("click", loadSchedule);
-    monthSelect.addEventListener("change", loadSchedule);
-    function selectCurrentMonth() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  const sheetName = String(year).slice(2) + String(month).padStart(2, "0");
-
-  if (monthSettings[sheetName]) {
-    monthSelect.value = sheetName;
-  }
+  return ContentService
+    .createTextOutput(JSON.stringify(rows))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
-selectCurrentMonth();
-loadSchedule();
-setInterval(loadSchedule, 10000);
+function updatePublicDoctorSchedule() {
+  const sourceSs = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const targetSs = SpreadsheetApp.openById(PUBLIC_SPREADSHEET_ID);
+  const doctorMaps = getDoctorMaps(sourceSs);
 
-  </script>
-</body>
-</html>
+  const sourceSheets = [
+    { sheetName: "2604", monthLabel: "2026/04", monthNumber: 4 },
+    { sheetName: "2605", monthLabel: "2026/05", monthNumber: 5 },
+    { sheetName: "2606", monthLabel: "2026/06", monthNumber: 6 }
+  ];
+
+  let targetSheet = targetSs.getSheetByName(PUBLIC_SHEET_NAME);
+
+  if (!targetSheet) {
+    targetSheet = targetSs.insertSheet(PUBLIC_SHEET_NAME);
+  }
+
+  const output = [
+    ["月份", "日期", "星期", "醫師", "時段", "原始分頁", "最後更新"]
+  ];
+
+  sourceSheets.forEach(function(source) {
+    const sheet = sourceSs.getSheetByName(source.sheetName);
+    if (!sheet) return;
+
+    const rows = getScheduleRows(sheet, doctorMaps, source.sheetName);
+
+    rows.forEach(function(row) {
+      row.doctors.forEach(function(doctor) {
+        output.push([
+          source.monthLabel,
+          source.monthNumber + "/" + Number(row.day),
+          row.weekday,
+          doctor.name,
+          doctor.start + "-" + doctor.end,
+          source.sheetName,
+          new Date()
+        ]);
+      });
+    });
+  });
+
+  targetSheet.clear();
+  targetSheet.getRange(1, 1, output.length, output[0].length).setValues(output);
+  targetSheet.setFrozenRows(1);
+  targetSheet.getRange(1, 1, 1, output[0].length).setFontWeight("bold");
+  targetSheet.autoResizeColumns(1, output[0].length);
+}
+
+function getScheduleRows(sheet, doctorMaps, sheetName) {
+  const values = sheet.getDataRange().getDisplayValues();
+  const result = [];
+
+  for (let r = 0; r < values.length; r++) {
+    if (values[r][0] === "醫師") {
+      const dateRow = values[r - 1] || [];
+      const doctorRow = values[r];
+
+      for (let c = 1; c <= 7; c++) {
+        const day = dateRow[c];
+        const rawCell = doctorRow[c];
+
+        if (!day || !rawCell) continue;
+
+        result.push({
+          sheet: sheetName,
+          yearMonth: sheetName,
+          day: Number(day),
+          weekday: values[1][c],
+          doctors: parseDoctorCell(rawCell, doctorMaps)
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+function parseDoctorCell(cellText, doctorMaps) {
+  const normalized = toHalfWidth(cellText)
+    .replace(/\r/g, "\n")
+    .replace(/（/g, "(")
+    .replace(/）/g, ")");
+
+  const lines = normalized
+    .split("\n")
+    .map(function(line) {
+      return line.trim();
+    })
+    .filter(function(line) {
+      return line !== "";
+    });
+
+  const doctors = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    const codeWithTime = line.match(/^([A-Z])\s*\((\d{1,2}:?\d{2})-(\d{1,2}:?\d{2})\)$/);
+    if (codeWithTime) {
+      doctors.push(buildDoctor(codeWithTime[1], "", codeWithTime[2], codeWithTime[3], doctorMaps));
+      continue;
+    }
+
+    const codeOnly = line.match(/^([A-Z])$/);
+    if (codeOnly) {
+      doctors.push(buildDoctor(codeOnly[1], "", "12:30", "20:30", doctorMaps));
+      continue;
+    }
+
+    const nameWithTime = line.match(/^(.+?)\s*(?:醫師|院長)?\s*\((\d{1,2}:?\d{2})-(\d{1,2}:?\d{2})\)$/);
+    if (nameWithTime) {
+      doctors.push(buildDoctor("", nameWithTime[1], nameWithTime[2], nameWithTime[3], doctorMaps));
+      continue;
+    }
+
+    const nameOnly = line.match(/^(.+?)\s*(?:醫師|院長)$/);
+    if (nameOnly) {
+      doctors.push(buildDoctor("", nameOnly[1], "12:30", "20:30", doctorMaps));
+    }
+  }
+
+  return doctors;
+}
+
+function buildDoctor(code, rawName, start, end, doctorMaps) {
+  const cleanCode = toHalfWidth(code || "").trim();
+  const cleanName = normalizeDoctorName(rawName || "");
+  const cleanStart = normalizeTime(start);
+  const cleanEnd = normalizeTime(end);
+
+  const byCode = cleanCode ? doctorMaps.byCode[cleanCode] : null;
+  const byName = cleanName ? doctorMaps.byName[cleanName] : null;
+  const match = byCode || byName || {};
+
+  return {
+    code: cleanCode || match.code || "",
+    name: match.displayName || cleanName || cleanCode,
+    sourceName: match.name || cleanName || "",
+    start: cleanStart,
+    end: cleanEnd,
+    fullDay: cleanStart === "12:30" && cleanEnd === "20:30"
+  };
+}
+
+function getDoctorMaps(ss) {
+  const sheet = ss.getSheetByName("醫師公開顯示名稱及對應代碼表");
+  const values = sheet.getDataRange().getDisplayValues();
+  const byCode = {};
+  const byName = {};
+
+  for (let r = 1; r < values.length; r++) {
+    const name = normalizeDoctorName(values[r][0] || "");
+    const code = toHalfWidth(values[r][4] || "").trim();
+    const displayName = (values[r][8] || "").trim();
+
+    if (!name && !code) continue;
+
+    const item = {
+      code: code,
+      name: name,
+      displayName: displayName || name
+    };
+
+    if (code) byCode[code] = item;
+    if (name) byName[name] = item;
+  }
+
+  return {
+    byCode: byCode,
+    byName: byName
+  };
+}
+
+function normalizeDoctorName(text) {
+  return String(text)
+    .replace(/\s/g, "")
+    .replace(/醫師/g, "")
+    .replace(/院長/g, "")
+    .trim();
+}
+
+function normalizeTime(time) {
+  const text = String(time).trim();
+
+  if (/^\d{3,4}$/.test(text)) {
+    const padded = text.padStart(4, "0");
+    return padded.slice(0, 2) + ":" + padded.slice(2);
+  }
+
+  return text;
+}
+
+function toHalfWidth(text) {
+  return String(text).replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(char) {
+    return String.fromCharCode(char.charCodeAt(0) - 0xFEE0);
+  });
+}
