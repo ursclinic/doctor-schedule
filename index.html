@@ -1,221 +1,126 @@
-const SPREADSHEET_ID = "1EJulohs-p5vFSXrEWdlj7L3WROZ7oe1DQygytFRxU8c";
-const SHEET_NAME = "2604";
-const PUBLIC_SPREADSHEET_ID = "1FQNgPmmFgleSbWBSrsq_1eTolAo7IrLHKsu2s4pR7gs";
-const PUBLIC_SHEET_NAME = "對外醫師班表即時更新";
-
-function doGet(e) {
-  const sheetName = e && e.parameter && e.parameter.sheet
-    ? e.parameter.sheet
-    : SHEET_NAME;
-
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const doctorMaps = getDoctorMaps(ss);
-  const sheet = ss.getSheetByName(sheetName);
-
-  if (!sheet) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ error: "找不到分頁：" + sheetName }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  const rows = getScheduleRows(sheet, doctorMaps, sheetName);
-
-  return ContentService
-    .createTextOutput(JSON.stringify(rows))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function updatePublicDoctorSchedule() {
-  const sourceSs = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const targetSs = SpreadsheetApp.openById(PUBLIC_SPREADSHEET_ID);
-  const doctorMaps = getDoctorMaps(sourceSs);
-
-  const sourceSheets = [
-    { sheetName: "2604", monthLabel: "2026/04", monthNumber: 4 },
-    { sheetName: "2605", monthLabel: "2026/05", monthNumber: 5 },
-    { sheetName: "2606", monthLabel: "2026/06", monthNumber: 6 }
-  ];
-
-  let targetSheet = targetSs.getSheetByName(PUBLIC_SHEET_NAME);
-
-  if (!targetSheet) {
-    targetSheet = targetSs.insertSheet(PUBLIC_SHEET_NAME);
-  }
-
-  const output = [
-    ["月份", "日期", "星期", "醫師", "時段", "原始分頁", "最後更新"]
-  ];
-
-  sourceSheets.forEach(function(source) {
-    const sheet = sourceSs.getSheetByName(source.sheetName);
-    if (!sheet) return;
-
-    const rows = getScheduleRows(sheet, doctorMaps, source.sheetName);
-
-    rows.forEach(function(row) {
-      row.doctors.forEach(function(doctor) {
-        output.push([
-          source.monthLabel,
-          source.monthNumber + "/" + Number(row.day),
-          row.weekday,
-          doctor.name,
-          doctor.start + "-" + doctor.end,
-          source.sheetName,
-          new Date()
-        ]);
-      });
-    });
-  });
-
-  targetSheet.clear();
-  targetSheet.getRange(1, 1, output.length, output[0].length).setValues(output);
-  targetSheet.setFrozenRows(1);
-  targetSheet.getRange(1, 1, 1, output[0].length).setFontWeight("bold");
-  targetSheet.autoResizeColumns(1, output[0].length);
-}
-
-function getScheduleRows(sheet, doctorMaps, sheetName) {
-  const values = sheet.getDataRange().getDisplayValues();
-  const result = [];
-
-  for (let r = 0; r < values.length; r++) {
-    if (values[r][0] === "醫師") {
-      const dateRow = values[r - 1] || [];
-      const doctorRow = values[r];
-
-      for (let c = 1; c <= 7; c++) {
-        const day = dateRow[c];
-        const rawCell = doctorRow[c];
-
-        if (!day || !rawCell) continue;
-
-        result.push({
-          sheet: sheetName,
-          yearMonth: sheetName,
-          day: Number(day),
-          weekday: values[1][c],
-          doctors: parseDoctorCell(rawCell, doctorMaps)
-        });
-      }
-    }
-  }
-
-  return result;
-}
-
-function parseDoctorCell(cellText, doctorMaps) {
-  const normalized = toHalfWidth(cellText)
-    .replace(/\r/g, "\n")
-    .replace(/（/g, "(")
-    .replace(/）/g, ")");
-
-  const lines = normalized
-    .split("\n")
-    .map(function(line) {
-      return line.trim();
-    })
-    .filter(function(line) {
-      return line !== "";
-    });
-
-  const doctors = [];
-
-  lines.forEach(function(line) {
-    const timeMatch = line.match(/\((\d{1,2}:?\d{2})-(\d{1,2}:?\d{2})\)/);
-    const start = timeMatch ? normalizeTime(timeMatch[1]) : "12:30";
-    const end = timeMatch ? normalizeTime(timeMatch[2]) : "20:30";
-
-    const personText = line
-      .replace(/\((\d{1,2}:?\d{2})-(\d{1,2}:?\d{2})\)/, "")
-      .trim();
-
-    const codeOnly = personText.match(/^([A-Z])$/);
-
-    if (codeOnly) {
-      doctors.push(buildDoctor(codeOnly[1], "", start, end, doctorMaps));
-      return;
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>醫師班表</title>
+  <style>
+    body {
+      margin: 0;
+      background: #f4f7f6;
+      color: #17211f;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Noto Sans TC", sans-serif;
     }
 
-    const cleanName = normalizeDoctorName(personText);
-
-    if (cleanName) {
-      doctors.push(buildDoctor("", cleanName, start, end, doctorMaps));
+    header {
+      padding: 24px;
+      background: white;
+      border-bottom: 1px solid #d9e2df;
     }
-  });
 
-  return doctors;
-}
+    .topbar, main {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
 
-function buildDoctor(code, rawName, start, end, doctorMaps) {
-  const cleanCode = toHalfWidth(code || "").trim();
-  const cleanName = normalizeDoctorName(rawName || "");
-  const cleanStart = normalizeTime(start);
-  const cleanEnd = normalizeTime(end);
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-end;
+    }
 
-  const byCode = cleanCode ? doctorMaps.byCode[cleanCode] : null;
-  const byName = cleanName ? doctorMaps.byName[cleanName] : null;
-  const match = byCode || byName || {};
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+    }
 
-  return {
-    code: cleanCode || match.code || "",
-    name: match.displayName || cleanName || cleanCode,
-    sourceName: match.name || cleanName || "",
-    start: cleanStart,
-    end: cleanEnd,
-    fullDay: cleanStart === "12:30" && cleanEnd === "20:30"
-  };
-}
+    .meta, .status {
+      color: #66736f;
+      font-size: 14px;
+    }
 
-function getDoctorMaps(ss) {
-  const sheet = ss.getSheetByName("醫師公開顯示名稱及對應代碼表");
-  const values = sheet.getDataRange().getDisplayValues();
-  const byCode = {};
-  const byName = {};
+    main {
+      padding: 24px;
+    }
 
-  for (let r = 1; r < values.length; r++) {
-    const name = normalizeDoctorName(values[r][0] || "");
-    const code = toHalfWidth(values[r][4] || "").trim();
-    const displayName = (values[r][8] || "").trim();
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
 
-    if (!name && !code) continue;
+    select, button {
+      min-height: 40px;
+      border-radius: 6px;
+      font: inherit;
+      padding: 0 12px;
+    }
 
-    const item = {
-      code: code,
-      name: name,
-      displayName: displayName || name
-    };
+    button {
+      border: 1px solid #197278;
+      background: #197278;
+      color: white;
+      cursor: pointer;
+    }
 
-    if (code) byCode[code] = item;
-    if (name) byName[name] = item;
-  }
+    select {
+      border: 1px solid #d9e2df;
+      background: white;
+    }
 
-  return {
-    byCode: byCode,
-    byName: byName
-  };
-}
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+    }
 
-function normalizeDoctorName(text) {
-  return String(text)
-    .replace(/\s/g, "")
-    .replace(/醫師/g, "")
-    .replace(/院長/g, "")
-    .trim();
-}
+    .weekday {
+      color: #66736f;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+    }
 
-function normalizeTime(time) {
-  const text = String(time).trim();
+    .day {
+      min-height: 132px;
+      background: white;
+      border: 1px solid #d9e2df;
+      border-radius: 8px;
+      padding: 10px;
+    }
 
-  if (/^\d{3,4}$/.test(text)) {
-    const padded = text.padStart(4, "0");
-    return padded.slice(0, 2) + ":" + padded.slice(2);
-  }
+    .day.empty {
+      background: transparent;
+      border-color: transparent;
+    }
 
-  return text;
-}
+    .date {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-weight: 800;
+    }
 
-function toHalfWidth(text) {
-  return String(text).replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(char) {
-    return String.fromCharCode(char.charCodeAt(0) - 0xFEE0);
-  });
-}
+    .doctor {
+      display: block;
+      margin-top: 6px;
+      padding: 7px 8px;
+      border-radius: 6px;
+      background: #e2f2f1;
+      color: #197278;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .doctor.partial {
+      background: #fff3d9;
+      color: #8a5a13;
+    }
+
+    .doctor-name {
+      font-weight: 800;
+    }
+
+   
