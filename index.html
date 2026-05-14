@@ -114,9 +114,24 @@
       line-height: 1.35;
     }
 
-    .doctor.partial {
-      background: #fff3d9;
-      color: #8a5a13;
+    .doctor-female-full {
+      background: #e986ad;
+      color: #ffffff;
+    }
+
+    .doctor-female-partial {
+      background: #f8d9e7;
+      color: #7b2947;
+    }
+
+    .doctor-male-full {
+      background: #8cc8e8;
+      color: #16394d;
+    }
+
+    .doctor-male-partial {
+      background: #d7effb;
+      color: #1d516a;
     }
 
     .doctor-name {
@@ -225,14 +240,30 @@
       return API_URL + "?sheet=" + encodeURIComponent(sheetName);
     }
 
+    function getDoctorColorClass(doctor) {
+      if (doctor.styleClass) {
+        return doctor.styleClass;
+      }
+
+      if (doctor.gender === "女") {
+        return doctor.fullDay ? "doctor-female-full" : "doctor-female-partial";
+      }
+
+      if (doctor.gender === "男") {
+        return doctor.fullDay ? "doctor-male-full" : "doctor-male-partial";
+      }
+
+      return "";
+    }
+
     function formatDoctor(doctor) {
       const name = doctor.name || doctor.code || "";
-      const isFullDay = doctor.start === "12:30" && doctor.end === "20:30";
+      const isFullDay = doctor.fullDay ?? (doctor.start === "12:30" && doctor.end === "20:30");
       const time = isFullDay ? "全天 12:30-20:30" : `${doctor.start}-${doctor.end}`;
-      const className = isFullDay ? "doctor" : "doctor partial";
+      const colorClass = getDoctorColorClass(doctor);
 
       return `
-        <span class="${className}">
+        <span class="doctor ${colorClass}">
           <span class="doctor-name">${name}</span>
           <span class="doctor-time">${time}</span>
         </span>
