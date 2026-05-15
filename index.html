@@ -12,9 +12,6 @@
       --line: #d9e2df;
       --card: #ffffff;
       --accent: #197278;
-      --accent-soft: #e2f2f1;
-      --partial: #8a5a13;
-      --partial-soft: #fff3d9;
       --danger: #b42318;
     }
 
@@ -143,15 +140,28 @@
       margin-top: 6px;
       padding: 7px 8px;
       border-radius: 6px;
-      background: var(--accent-soft);
-      color: var(--accent);
       font-size: 13px;
       line-height: 1.35;
     }
 
-    .doctor.partial {
-      background: var(--partial-soft);
-      color: var(--partial);
+    .doctor-female-full {
+      background: #e986ad;
+      color: #ffffff;
+    }
+
+    .doctor-female-partial {
+      background: #f8d9e7;
+      color: #7b2947;
+    }
+
+    .doctor-male-full {
+      background: #8cc8e8;
+      color: #16394d;
+    }
+
+    .doctor-male-partial {
+      background: #d7effb;
+      color: #1d516a;
     }
 
     .doctor-name {
@@ -277,6 +287,34 @@
       P: "P醫師"
     };
 
+    const doctorGenderMap = {
+      "謝旻益院長": "男",
+      "謝旻益": "男",
+      "江鎮佑醫師": "男",
+      "江鎮佑": "男",
+      "陳淳醫師": "男",
+      "陳淳": "男",
+      "楊醫師": "男",
+      "楊": "男",
+      "黃醫師": "男",
+      "黃": "男",
+      "詹喬雅醫師": "女",
+      "詹喬雅": "女",
+      "何佳潔醫師": "女",
+      "何佳潔": "女",
+      "張佳螢醫師": "女",
+      "張佳螢": "女",
+      "陳醫師": "女",
+      "陳宜君醫師": "女",
+      "陳宜君": "女",
+      "陳若瑄醫師": "女",
+      "陳若瑄": "女",
+      "郭醫師": "女",
+      "郭": "女",
+      "潘醫師": "女",
+      "潘": "女"
+    };
+
     const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
     const calendar = document.getElementById("calendar");
     const status = document.getElementById("status");
@@ -286,14 +324,54 @@
     const pageTitle = document.getElementById("pageTitle");
     const sourceLabel = document.getElementById("sourceLabel");
 
+    function normalizeDoctorKey(value) {
+      return String(value || "").replace(/\s/g, "");
+    }
+
+    function getDoctorGender(doctor) {
+      if (doctor.gender) return doctor.gender;
+
+      const candidates = [
+        doctor.name,
+        doctor.sourceName,
+        doctorNames[doctor.code],
+        doctor.code
+      ];
+
+      for (const candidate of candidates) {
+        const exact = doctorGenderMap[candidate];
+        if (exact) return exact;
+
+        const normalized = normalizeDoctorKey(candidate);
+        if (doctorGenderMap[normalized]) return doctorGenderMap[normalized];
+      }
+
+      return "";
+    }
+
+    function getDoctorColorClass(doctor) {
+      const gender = getDoctorGender(doctor);
+      const isFullDay = doctor.fullDay ?? (doctor.start === "12:30" && doctor.end === "20:30");
+
+      if (gender === "女") {
+        return isFullDay ? "doctor-female-full" : "doctor-female-partial";
+      }
+
+      if (gender === "男") {
+        return isFullDay ? "doctor-male-full" : "doctor-male-partial";
+      }
+
+      return "";
+    }
+
     function formatDoctor(doctor) {
       const name = doctor.name || doctorNames[doctor.code] || doctor.code;
-      const isFullDay = doctor.start === "12:30" && doctor.end === "20:30";
+      const isFullDay = doctor.fullDay ?? (doctor.start === "12:30" && doctor.end === "20:30");
       const time = isFullDay ? "全天 12:30-20:30" : `${doctor.start}-${doctor.end}`;
-      const className = isFullDay ? "doctor" : "doctor partial";
+      const colorClass = getDoctorColorClass(doctor);
 
       return `
-        <span class="${className}">
+        <span class="doctor ${colorClass}">
           <span class="doctor-name">${name}</span>
           <span class="doctor-time">${time}</span>
         </span>
