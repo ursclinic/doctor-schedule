@@ -125,6 +125,16 @@
       border-color: transparent;
     }
 
+    .day.today {
+      background: #fff1e4;
+      border-color: #f3b27a;
+      box-shadow: inset 0 0 0 1px #ffd2ad;
+    }
+
+    .day.today .date {
+      color: #9a4e12;
+    }
+
     .date {
       display: flex;
       align-items: center;
@@ -385,6 +395,10 @@
     function renderSchedule(rows, settings) {
       const byDay = new Map(rows.map(row => [Number(row.day), row]));
       const cells = [];
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      const currentDay = now.getDate();
 
       weekdays.forEach(day => {
         cells.push(`<div class="weekday">${day}</div>`);
@@ -401,8 +415,13 @@
           ? row.doctors.map(formatDoctor).join("")
           : `<span class="meta">未排診</span>`;
 
+        const isToday =
+          currentYear === 2000 + Number(settings.source.slice(0, 2)) &&
+          currentMonth === settings.month &&
+          currentDay === day;
+
         cells.push(`
-          <article class="day">
+          <article class="day ${isToday ? "today" : ""}">
             <div class="date">
               <span>${settings.month}/${day}</span>
               <span class="meta">${weekday}</span>
