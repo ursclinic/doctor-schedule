@@ -1,3 +1,353 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>醫師班表</title>
+  <style>
+    :root {
+      --bg: #f4f7f6;
+      --text: #17211f;
+      --muted: #66736f;
+      --line: #d9e2df;
+      --card: #ffffff;
+      --accent: #197278;
+      --danger: #b42318;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", sans-serif;
+    }
+
+    header {
+      padding: 24px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: #fff;
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 6px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button:hover {
+      filter: brightness(0.95);
+    }
+
+    select {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 6px;
+      padding: 0 12px;
+      font: inherit;
+    }
+
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .weekday {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      padding: 4px 0;
+    }
+
+    .day {
+      min-height: 132px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .day.empty {
+      background: transparent;
+      border-color: transparent;
+    }
+
+    .day.today {
+      background: #fff1e4;
+      border-color: #f3b27a;
+      box-shadow: inset 0 0 0 1px #ffd2ad;
+    }
+
+    .day.today .date {
+      color: #9a4e12;
+    }
+
+    .date {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-weight: 800;
+    }
+
+    .doctor {
+      display: block;
+      width: 100%;
+      margin-top: 6px;
+      padding: 7px 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .doctor-female-full {
+      background: #f6b6cb;
+      color: #4a2a35;
+    }
+
+    .doctor-female-partial {
+      background: #feebf1;
+      color: #4a2a35;
+    }
+
+    .doctor-male-full {
+      background: #8cc8e8;
+      color: #16394d;
+    }
+
+    .doctor-male-partial {
+      background: #d7effb;
+      color: #1d516a;
+    }
+
+    .doctor-name {
+      font-weight: 800;
+    }
+
+    .doctor-time {
+      display: block;
+      margin-top: 2px;
+    }
+
+    .error {
+      color: var(--danger);
+      background: #fff;
+      border: 1px solid #f3b8b3;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    @media (max-width: 760px) {
+      header {
+        padding: 18px;
+      }
+
+      main {
+        padding: 16px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .calendar {
+        grid-template-columns: 1fr;
+      }
+
+      .weekday,
+      .day.empty {
+        display: none;
+      }
+
+      .day {
+        min-height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">醫師班表</h1>
+        <div class="meta" id="sourceLabel">資料來源：Google Sheet</div>
+      </div>
+      <div>
+        <select id="monthSelect" aria-label="選擇月份"></select>
+        <button type="button" id="refreshButton">重新整理</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="error" class="error"></div>
+    <div class="toolbar">
+      <div class="status" id="status">尚未載入</div>
+      <div class="status">每 10 秒自動更新</div>
+    </div>
+    <section class="calendar" id="calendar" aria-label="醫師班表月曆"></section>
+  </main>
+
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycby95ijwscdTkEVB8XhP_xuy2sVJt7OWt9tySfh0coMrJ5kI1IW5j1FXydN7vVpmBqmI/exec";
+
+    const doctorNames = {
+      A: "A醫師",
+      B: "B醫師",
+      C: "C醫師",
+      D: "D醫師",
+      E: "E醫師",
+      F: "F醫師",
+      G: "G醫師",
+      H: "H醫師",
+      J: "J醫師",
+      P: "P醫師"
+    };
+
+    const doctorGenderMap = {
+      "謝旻益院長": "男",
+      "謝旻益": "男",
+      "江鎮佑醫師": "男",
+      "江鎮佑": "男",
+      "陳淳醫師": "男",
+      "陳淳": "男",
+      "楊醫師": "男",
+      "楊": "男",
+      "黃醫師": "男",
+      "黃": "男",
+      "詹喬雅醫師": "女",
+      "詹喬雅": "女",
+      "何佳潔醫師": "女",
+      "何佳潔": "女",
+      "張佳螢醫師": "女",
+      "張佳螢": "女",
+      "陳醫師": "女",
+      "陳宜君醫師": "女",
+      "陳宜君": "女",
+      "陳若瑄醫師": "女",
+      "陳若瑄": "女",
+      "郭醫師": "女",
+      "郭": "女",
+      "潘醫師": "女",
+      "潘": "女"
+    };
+
+    const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+    const calendar = document.getElementById("calendar");
+    const status = document.getElementById("status");
+    const errorBox = document.getElementById("error");
+    const refreshButton = document.getElementById("refreshButton");
+    const monthSelect = document.getElementById("monthSelect");
+    const pageTitle = document.getElementById("pageTitle");
+    const sourceLabel = document.getElementById("sourceLabel");
+
+    let monthSettings = {};
+
+    function normalizeDoctorKey(value) {
+      return String(value || "").replace(/\s/g, "");
+    }
+
+    function getDoctorGender(doctor) {
+      if (doctor.gender) return doctor.gender;
+
+      const candidates = [
+        doctor.name,
+        doctor.sourceName,
+        doctorNames[doctor.code],
+        doctor.code
+      ];
+
+      for (const candidate of candidates) {
+        const exact = doctorGenderMap[candidate];
+        if (exact) return exact;
+
+        const normalized = normalizeDoctorKey(candidate);
+        if (doctorGenderMap[normalized]) return doctorGenderMap[normalized];
+      }
+
+      return "";
+    }
+
+    function getDoctorColorClass(doctor) {
+      const gender = getDoctorGender(doctor);
+      const isFullDay = doctor.fullDay ?? (doctor.start === "12:30" && doctor.end === "20:30");
+
+      if (gender === "女") {
+        return isFullDay ? "doctor-female-full" : "doctor-female-partial";
+      }
+
+      if (gender === "男") {
+        return isFullDay ? "doctor-male-full" : "doctor-male-partial";
+      }
+
+      return "";
+    }
+
+    function formatDoctor(doctor) {
+      const name = doctor.name || doctorNames[doctor.code] || doctor.code;
+      const isFullDay = doctor.fullDay ?? (doctor.start === "12:30" && doctor.end === "20:30");
+      const time = isFullDay ? "全天 12:30-20:30" : `${doctor.start}-${doctor.end}`;
+      const colorClass = getDoctorColorClass(doctor);
+
+      return `
+        <span class="doctor ${colorClass}">
           <span class="doctor-name">${name}</span>
           <span class="doctor-time">${time}</span>
         </span>
