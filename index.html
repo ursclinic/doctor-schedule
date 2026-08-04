@@ -240,7 +240,7 @@
     <div id="error" class="error"></div>
     <div class="toolbar">
       <div class="status" id="status">尚未載入</div>
-      <div class="status">每 10 秒自動更新</div>
+      <div class="status">每 60 秒自動更新</div>
     </div>
     <section class="calendar" id="calendar" aria-label="醫師班表月曆"></section>
   </main>
@@ -540,7 +540,7 @@
 
       refreshTimerId = setInterval(function() {
         loadSchedule();
-      }, 10000);
+      }, 60000);
     }
 
     async function initializePage() {
